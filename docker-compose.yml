@@ -1,0 +1,69 @@
+version: '3.7'
+
+volumes:
+  nextcloud:
+     name: "nextcloud-data"
+#    driver: "local"
+#    driver_opts:
+#      type: "none"
+#      o: "bind,rw"
+#      device: "${NEXTCLOUD_DIR}"
+
+networks:
+  traefik-network:
+    external: true
+    name: ${TRAEFIK_NETWORK}
+#  nextcloud-internal:
+#    external: false
+
+services:
+  nextcloud:
+    image: nextcloud
+    container_name: nextcloud
+    expose:
+      - 80
+    networks:
+      - traefik-network
+    volumes:
+      - nextcloud:/var/www/html:rw
+    restart: always
+    environment:
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASS}
+      NEXTCLOUD_TABLE_PREFIX: ${NEXTCLOUD_TABLE_PREFIX}
+      MYSQL_HOST: ${MYSQL_HOST}
+      MYSQL_DATABASE: ${MYSQL_DB}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASS}
+    labels:
+      traefik.backend: 'nextcloud'
+      traefik.docker.network: '${TRAEFIK_NETWORK}'
+      traefik.enable: 'true'
+      traefik.frontend.rule: "Host:${NEXTCLOUD_DOMAIN}"
+      traefik.port: 80
+      traefik.frontend.headers.SSLRedirect: "${HTTPS}"
+      traefik.frontend.headers.STSSeconds: 15552000
+      traefik.frontend.headers.STSIncludeSubdomains: 'true'
+      traefik.frontend.headers.STSPreload: 'true'
+      traefik.frontend.headers.referrerPolicy: 'same-origin'
+      traefik.frontend.headers.browserXSSFilter: 'true'
+      traefik.frontend.headers.customResponseHeaders: 'X-Content-Type-Options:nosniff||X-Robots-Tag:none||X-Frame-Options:SAMEORIGIN'
+
+  nextcloud-backup:
+    image: dotburo/nextcloud-backup
+    container_name: nextcloud-backup
+    networks:
+      - traefik-network
+    volumes:
+      - nextcloud:/nextcloud
+      - ./backup:/backup
+    environment:
+      MYSQL_HOST: ${MYSQL_HOST}
+      MYSQL_DATABASE: ${MYSQL_DB}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASS}
+      scheduler: 1
+    labels:
+      traefik.backend: false
+
+
